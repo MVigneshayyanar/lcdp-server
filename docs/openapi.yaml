@@ -1,0 +1,1231 @@
+openapi: 3.0.3
+info:
+  title: LCDP Restaurant API
+  version: 1.0.0
+  description: REST API for restaurant operations (users, tables, menu, inventory, orders, billing).
+servers:
+  - url: http://localhost:8080
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    LoginResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [sent, otp_unavailable]
+    VerifyRequest:
+      type: object
+      required: [phone, otp]
+      properties:
+        phone:
+          type: string
+        otp:
+          type: string
+    VerifyResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        session_expires_at:
+          type: string
+          format: date-time
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        role:
+          type: string
+          enum: [waiter, manager, admin, owner]
+        phone:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UserRequest:
+      type: object
+      required: [name, role, phone]
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [waiter, manager, admin, owner]
+        phone:
+          type: string
+    DiningTable:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        status:
+          type: string
+          enum: [available, ordered, preparing, ready, eating, dirty]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DiningTableRequest:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [available, ordered, preparing, ready, eating, dirty]
+    DiningTableStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [available, ordered, preparing, ready, eating, dirty]
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+        is_available:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    MenuItemRequest:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+        is_available:
+          type: boolean
+    MenuItemUpdateRequest:
+      type: object
+      required: [name, price, is_available]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+        is_available:
+          type: boolean
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        address:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    VendorRequest:
+      type: object
+      required: [name, address, email, phone]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+    InventoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        vendor_id:
+          type: integer
+          format: int64
+        min_stock:
+          type: number
+        category:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    InventoryItemView:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        vendor:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    InventoryItemRequest:
+      type: object
+      required: [name, quantity, unit, vendor_id]
+      properties:
+        name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        vendor_id:
+          type: integer
+          format: int64
+        min_stock:
+          type: number
+        category:
+          type: string
+    Bill:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        vendor_id:
+          type: integer
+          format: int64
+        txn_id:
+          type: string
+        amount:
+          type: number
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BillView:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        vendor:
+          type: string
+        txn_id:
+          type: string
+        amount:
+          type: number
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BillRequest:
+      type: object
+      required: [vendor_id, txn_id, amount, due_date, status]
+      properties:
+        vendor_id:
+          type: integer
+          format: int64
+        txn_id:
+          type: string
+        amount:
+          type: number
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        menu_item_id:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+        table_id:
+          type: integer
+          format: int64
+        ordered_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OrderViewItem:
+      type: object
+      properties:
+        name:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+    OrderView:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        tableId:
+          type: integer
+          format: int64
+        tableName:
+          type: string
+        status:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderViewItem'
+        createdAt:
+          type: string
+    OrderRequestItem:
+      type: object
+      required: [menuItemId, quantity]
+      properties:
+        menuItemId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+    OrderRequest:
+      type: object
+      required: [tableId, items]
+      properties:
+        tableId:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderRequestItem'
+    AnalyticsOverview:
+      type: object
+      properties:
+        todayRevenue:
+          type: number
+        revenueChange:
+          type: number
+        ordersToday:
+          type: integer
+        ordersChange:
+          type: number
+        avgOrderValue:
+          type: number
+        avgOrderChange:
+          type: number
+        customersServed:
+          type: integer
+        customersChange:
+          type: number
+        weeklyRevenue:
+          type: array
+          items:
+            type: number
+        topItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopItem'
+    TopItem:
+      type: object
+      properties:
+        name:
+          type: string
+        unitsSold:
+          type: integer
+        revenue:
+          type: number
+        rank:
+          type: integer
+        growth:
+          type: number
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [warning, critical]
+        read:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+    KitchenOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        table:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            type: string
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        frequency:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        size:
+          type: string
+paths:
+  /login:
+    get:
+      summary: Request OTP
+      parameters:
+        - in: query
+          name: phone
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [waiter, manager, admin, owner]
+      responses:
+        '200':
+          description: OTP sent (or unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+  /login/verify:
+    post:
+      summary: Verify OTP and create session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+  /v1/auth/manager/login:
+    post:
+      summary: Manager Email/Password Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Success
+  /v1/auth/owner/login:
+    post:
+      summary: Owner Email/Password Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Success
+  /v1/auth/otp/send:
+    post:
+      summary: Flutter Waiter App OTP Send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: Success
+  /v1/auth/otp/verify:
+    post:
+      summary: Flutter Waiter App OTP Verify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                otp:
+                  type: string
+                code:
+                  type: string
+      responses:
+        '200':
+          description: Success
+  /v1/analytics/overview:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get analytics overview
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsOverview'
+  /v1/analytics/revenue:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get revenue analytics
+      responses:
+        '200':
+          description: Success
+  /v1/analytics/sales:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get sales analytics
+      responses:
+        '200':
+          description: Success
+  /v1/analytics/inventory:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get inventory analytics
+      responses:
+        '200':
+          description: Success
+  /v1/tables:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List dining tables
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiningTable'
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create dining table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiningTableRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/tables/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get dining table
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete dining table
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/tables/{id}/status:
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Update dining table status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiningTableStatusRequest'
+      responses:
+        '200':
+          description: Success
+  /v1/menu:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List menu items
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuItem'
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create menu item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItemRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/menu/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get menu item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Update menu item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItemRequest'
+      responses:
+        '200':
+          description: Success
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete menu item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/orders:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List orders
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderView'
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/orders/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get order details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete order
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/orders/{id}/served:
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Mark order as served
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+  /v1/inventory:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List inventory items
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItem'
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create inventory item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/inventory/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get inventory item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Update inventory item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRequest'
+      responses:
+        '200':
+          description: Success
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete inventory item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/payables:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List all payables (bills)
+      responses:
+        '200':
+          description: Success
+  /v1/payables/{id}/paid:
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Mark a payable as paid
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+  /v1/alerts:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List active alerts
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alert'
+  /v1/alerts/{id}/read:
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Mark alert as read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+  /v1/kitchen/orders:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List orders for kitchen display
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KitchenOrder'
+  /v1/kitchen/orders/{id}/start:
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Start preparing kitchen order
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+  /v1/kitchen/orders/{id}/ready:
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Mark kitchen order as ready
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+  /v1/waiters:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List waiters (users)
+      responses:
+        '200':
+          description: Success
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create waiter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/waiters/{id}:
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete waiter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/users:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List users
+      responses:
+        '200':
+          description: Success
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create user
+      responses:
+        '201':
+          description: Success
+  /v1/vendors:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List vendors
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vendor'
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/vendors/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get vendor details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Update vendor
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorRequest'
+      responses:
+        '200':
+          description: Success
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete vendor
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/bills:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List bills
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bill'
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create bill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillRequest'
+      responses:
+        '201':
+          description: Success
+  /v1/bills/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get bill details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+    patch:
+      security:
+        - bearerAuth: []
+      summary: Update bill
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillRequest'
+      responses:
+        '200':
+          description: Success
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete bill
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Success
+  /v1/reports:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List available reports
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
