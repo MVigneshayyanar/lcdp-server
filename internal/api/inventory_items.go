@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/Maestrominds/lcdp-restaurant/internal/sqlc"
 )
 
@@ -49,16 +50,11 @@ func (h *Handler) CreateInventoryItem(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "missing_fields", "Name and Unit are required")
 	}
 
-	if req.Quantity < 0 {
-		return writeError(c, fiber.StatusBadRequest, "invalid_quantity", "Quantity cannot be negative")
-	}
-
 	ctx := context.Background()
 	
 	// Resolve Vendor
 	req.Vendor = strings.TrimSpace(req.Vendor)
 	if req.Vendor != "" {
-		// Prioritize the name string to allow editing vendors via text input
 		vendors, _ := h.DB.ListVendors(ctx)
 		found := false
 		for _, v := range vendors {
@@ -74,7 +70,6 @@ func (h *Handler) CreateInventoryItem(c *fiber.Ctx) error {
 				Address: "N/A",
 				Email:   fmt.Sprintf("vendor-%d@cafedeparis.com", time.Now().UnixNano()),
 				Phone:   fmt.Sprintf("%d", time.Now().UnixNano())[:10],
-				Status:  "active",
 			})
 			if err != nil {
 				return writeError(c, fiber.StatusInternalServerError, "vendor_creation_failed", "Failed to create new vendor: "+err.Error())
@@ -82,7 +77,6 @@ func (h *Handler) CreateInventoryItem(c *fiber.Ctx) error {
 			req.VendorID = v.ID
 		}
 	} else if req.VendorID <= 0 {
-		// Fallback only if both name and ID are missing
 		vendors, _ := h.DB.ListVendors(ctx)
 		if len(vendors) > 0 {
 			req.VendorID = vendors[0].ID
@@ -92,7 +86,6 @@ func (h *Handler) CreateInventoryItem(c *fiber.Ctx) error {
 				Address: "N/A",
 				Email:   fmt.Sprintf("general-%d@cafedeparis.com", time.Now().UnixNano()),
 				Phone:   fmt.Sprintf("%d", time.Now().UnixNano())[:10],
-				Status:  "active",
 			})
 			if err != nil {
 				return writeError(c, fiber.StatusInternalServerError, "vendor_creation_failed", "Failed to create default vendor: "+err.Error())
@@ -111,7 +104,7 @@ func (h *Handler) CreateInventoryItem(c *fiber.Ctx) error {
 		Unit:     req.Unit,
 		VendorID: req.VendorID,
 		Category: req.Category,
-		MinStock: req.MinStock,
+		MinStock: pgtype.Float8{Float64: req.MinStock, Valid: true},
 	})
 	if err != nil {
 		return handleDBError(c, err)
@@ -140,9 +133,9 @@ func (h *Handler) ListInventoryItems(c *fiber.Ctx) error {
 	views := make([]inventoryItemView, 0, len(items))
 	for _, item := range items {
 		status := "ok"
-		if item.Quantity <= item.MinStock/2 {
+		if item.Quantity <= item.MinStock.Float64/2 {
 			status = "critical"
-		} else if item.Quantity <= item.MinStock {
+		} else if item.Quantity <= item.MinStock.Float64 {
 			status = "low"
 		}
 
@@ -154,7 +147,7 @@ func (h *Handler) ListInventoryItems(c *fiber.Ctx) error {
 			Vendor:      vendorNames[item.VendorID],
 			VendorID:    item.VendorID,
 			Category:    item.Category,
-			MinStock:    item.MinStock,
+			MinStock:    item.MinStock.Float64,
 			Status:      status,
 			LastUpdated: formatTime(item.UpdatedAt),
 			CreatedAt:   formatTime(item.CreatedAt),
@@ -183,9 +176,9 @@ func (h *Handler) GetInventoryItem(c *fiber.Ctx) error {
 	}
 
 	status := "ok"
-	if item.Quantity <= item.MinStock/2 {
+	if item.Quantity <= item.MinStock.Float64/2 {
 		status = "critical"
-	} else if item.Quantity <= item.MinStock {
+	} else if item.Quantity <= item.MinStock.Float64 {
 		status = "low"
 	}
 
@@ -197,7 +190,7 @@ func (h *Handler) GetInventoryItem(c *fiber.Ctx) error {
 		Vendor:      vendor.Name,
 		VendorID:    item.VendorID,
 		Category:    item.Category,
-		MinStock:    item.MinStock,
+		MinStock:    item.MinStock.Float64,
 		Status:      status,
 		LastUpdated: formatTime(item.UpdatedAt),
 		CreatedAt:   formatTime(item.CreatedAt),
@@ -229,7 +222,6 @@ func (h *Handler) UpdateInventoryItem(c *fiber.Ctx) error {
 	// Resolve Vendor
 	req.Vendor = strings.TrimSpace(req.Vendor)
 	if req.Vendor != "" {
-		// Prioritize the name string to allow editing vendors via text input
 		vendors, _ := h.DB.ListVendors(ctx)
 		found := false
 		for _, v := range vendors {
@@ -245,7 +237,6 @@ func (h *Handler) UpdateInventoryItem(c *fiber.Ctx) error {
 				Address: "N/A",
 				Email:   fmt.Sprintf("vendor-%d@cafedeparis.com", time.Now().UnixNano()),
 				Phone:   fmt.Sprintf("%d", time.Now().UnixNano())[:10],
-				Status:  "active",
 			})
 			if err != nil {
 				return writeError(c, fiber.StatusInternalServerError, "vendor_creation_failed", "Failed to create new vendor: "+err.Error())
@@ -253,7 +244,6 @@ func (h *Handler) UpdateInventoryItem(c *fiber.Ctx) error {
 			req.VendorID = v.ID
 		}
 	} else if req.VendorID <= 0 {
-		// Fallback only if both name and ID are missing
 		vendors, _ := h.DB.ListVendors(ctx)
 		if len(vendors) > 0 {
 			req.VendorID = vendors[0].ID
@@ -263,7 +253,6 @@ func (h *Handler) UpdateInventoryItem(c *fiber.Ctx) error {
 				Address: "N/A",
 				Email:   fmt.Sprintf("general-%d@cafedeparis.com", time.Now().UnixNano()),
 				Phone:   fmt.Sprintf("%d", time.Now().UnixNano())[:10],
-				Status:  "active",
 			})
 			if err != nil {
 				return writeError(c, fiber.StatusInternalServerError, "vendor_creation_failed", "Failed to create default vendor: "+err.Error())
@@ -279,7 +268,7 @@ func (h *Handler) UpdateInventoryItem(c *fiber.Ctx) error {
 		Unit:     req.Unit,
 		VendorID: req.VendorID,
 		Category: req.Category,
-		MinStock: req.MinStock,
+		MinStock: pgtype.Float8{Float64: req.MinStock, Valid: true},
 	})
 	if err != nil {
 		return handleDBError(c, err)

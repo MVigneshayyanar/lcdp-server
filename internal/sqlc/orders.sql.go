@@ -14,7 +14,7 @@ import (
 const createOrder = `-- name: CreateOrder :one
 INSERT INTO orders (menu_item_id, quantity, table_id, ordered_at, status)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, menu_item_id, quantity, table_id, ordered_at, status, created_at, updated_at
+RETURNING id, menu_item_id, quantity, table_id, ordered_at, created_at, updated_at, status
 `
 
 type CreateOrderParams struct {
@@ -40,9 +40,9 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 		&i.Quantity,
 		&i.TableID,
 		&i.OrderedAt,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
 	)
 	return i, err
 }
@@ -58,7 +58,7 @@ func (q *Queries) DeleteOrder(ctx context.Context, id int64) error {
 }
 
 const getOrder = `-- name: GetOrder :one
-SELECT id, menu_item_id, quantity, table_id, ordered_at, status, created_at, updated_at FROM orders
+SELECT id, menu_item_id, quantity, table_id, ordered_at, created_at, updated_at, status FROM orders
 WHERE id = $1
 `
 
@@ -71,16 +71,16 @@ func (q *Queries) GetOrder(ctx context.Context, id int64) (Order, error) {
 		&i.Quantity,
 		&i.TableID,
 		&i.OrderedAt,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
 	)
 	return i, err
 }
 
 const listOrders = `-- name: ListOrders :many
-SELECT id, menu_item_id, quantity, table_id, ordered_at, status, created_at, updated_at FROM orders
-ORDER BY id
+SELECT id, menu_item_id, quantity, table_id, ordered_at, created_at, updated_at, status FROM orders
+ORDER BY ordered_at DESC
 `
 
 func (q *Queries) ListOrders(ctx context.Context) ([]Order, error) {
@@ -98,9 +98,9 @@ func (q *Queries) ListOrders(ctx context.Context) ([]Order, error) {
 			&i.Quantity,
 			&i.TableID,
 			&i.OrderedAt,
-			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Status,
 		); err != nil {
 			return nil, err
 		}
@@ -121,7 +121,7 @@ SET menu_item_id = $2,
     status = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, menu_item_id, quantity, table_id, ordered_at, status, created_at, updated_at
+RETURNING id, menu_item_id, quantity, table_id, ordered_at, created_at, updated_at, status
 `
 
 type UpdateOrderParams struct {
@@ -149,9 +149,9 @@ func (q *Queries) UpdateOrder(ctx context.Context, arg UpdateOrderParams) (Order
 		&i.Quantity,
 		&i.TableID,
 		&i.OrderedAt,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
 	)
 	return i, err
 }

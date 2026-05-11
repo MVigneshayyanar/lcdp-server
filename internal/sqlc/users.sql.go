@@ -10,27 +10,25 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (name, role, phone, status)
-VALUES ($1, $2, $3, $4)
-RETURNING id, name, role, phone, status, created_at, updated_at
+INSERT INTO users (name, role, phone)
+VALUES ($1, $2, $3)
+RETURNING id, name, role, phone, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Name   string   `json:"name"`
-	Role   UserRole `json:"role"`
-	Phone  string   `json:"phone"`
-	Status string   `json:"status"`
+	Name  string   `json:"name"`
+	Role  UserRole `json:"role"`
+	Phone string   `json:"phone"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Role, arg.Phone, arg.Status)
+	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Role, arg.Phone)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Role,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -48,7 +46,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, name, role, phone, status, created_at, updated_at FROM users
+SELECT id, name, role, phone, created_at, updated_at FROM users
 WHERE id = $1
 `
 
@@ -60,7 +58,6 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Name,
 		&i.Role,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -68,7 +65,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 }
 
 const getUserByPhone = `-- name: GetUserByPhone :one
-SELECT id, name, role, phone, status, created_at, updated_at FROM users
+SELECT id, name, role, phone, created_at, updated_at FROM users
 WHERE phone = $1
 `
 
@@ -80,7 +77,6 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phone string) (User, error
 		&i.Name,
 		&i.Role,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -88,7 +84,7 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phone string) (User, error
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, name, role, phone, status, created_at, updated_at FROM users
+SELECT id, name, role, phone, created_at, updated_at FROM users
 ORDER BY id
 `
 
@@ -106,7 +102,6 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.Name,
 			&i.Role,
 			&i.Phone,
-			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -125,18 +120,16 @@ UPDATE users
 SET name = $2,
     role = $3,
     phone = $4,
-    status = $5,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, role, phone, status, created_at, updated_at
+RETURNING id, name, role, phone, created_at, updated_at
 `
 
 type UpdateUserParams struct {
-	ID     int64    `json:"id"`
-	Name   string   `json:"name"`
-	Role   UserRole `json:"role"`
-	Phone  string   `json:"phone"`
-	Status string   `json:"status"`
+	ID    int64    `json:"id"`
+	Name  string   `json:"name"`
+	Role  UserRole `json:"role"`
+	Phone string   `json:"phone"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
@@ -145,7 +138,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.Name,
 		arg.Role,
 		arg.Phone,
-		arg.Status,
 	)
 	var i User
 	err := row.Scan(
@@ -153,7 +145,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Name,
 		&i.Role,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

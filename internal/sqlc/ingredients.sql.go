@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createIngredient = `-- name: CreateIngredient :one
@@ -50,8 +52,8 @@ DELETE FROM ingredients
 WHERE menu_item_id = $1
 `
 
-func (q *Queries) DeleteIngredientsByMenuItem(ctx context.Context, menuItemId int64) error {
-	_, err := q.db.Exec(ctx, deleteIngredientsByMenuItem, menuItemId)
+func (q *Queries) DeleteIngredientsByMenuItem(ctx context.Context, menuItemID int64) error {
+	_, err := q.db.Exec(ctx, deleteIngredientsByMenuItem, menuItemID)
 	return err
 }
 
@@ -95,6 +97,53 @@ func (q *Queries) ListIngredients(ctx context.Context) ([]Ingredient, error) {
 			&i.Quantity,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listIngredientsByMenuItem = `-- name: ListIngredientsByMenuItem :many
+SELECT i.id, i.menu_item_id, i.inventory_item_id, i.quantity, i.created_at, i.updated_at, inv.name as inventory_item_name, inv.unit as inventory_item_unit
+FROM ingredients i
+JOIN inventory_items inv ON i.inventory_item_id = inv.id
+WHERE i.menu_item_id = $1
+`
+
+type ListIngredientsByMenuItemRow struct {
+	ID                int64              `json:"id"`
+	MenuItemID        int64              `json:"menu_item_id"`
+	InventoryItemID   int64              `json:"inventory_item_id"`
+	Quantity          float64            `json:"quantity"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	InventoryItemName string             `json:"inventory_item_name"`
+	InventoryItemUnit string             `json:"inventory_item_unit"`
+}
+
+func (q *Queries) ListIngredientsByMenuItem(ctx context.Context, menuItemID int64) ([]ListIngredientsByMenuItemRow, error) {
+	rows, err := q.db.Query(ctx, listIngredientsByMenuItem, menuItemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIngredientsByMenuItemRow
+	for rows.Next() {
+		var i ListIngredientsByMenuItemRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MenuItemID,
+			&i.InventoryItemID,
+			&i.Quantity,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.InventoryItemName,
+			&i.InventoryItemUnit,
 		); err != nil {
 			return nil, err
 		}

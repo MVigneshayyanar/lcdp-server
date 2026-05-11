@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,28 +11,7 @@ import (
 )
 
 type diningTableRequest struct {
-	Number int32  `json:"number"`
-	Status string `json:"status"`
-	Name   string `json:"name"`
-	Seats  int32  `json:"seats"`
-}
-
-type diningTableStatusRequest struct {
-	Status string `json:"status"`
-}
-
-var allowedDiningTableStatuses = map[string]struct{}{
-	"available": {},
-	"ordered":   {},
-	"preparing": {},
-	"ready":      {},
-	"eating":    {},
-	"billed":    {},
-}
-
-func isValidDiningTableStatus(status string) bool {
-	_, ok := allowedDiningTableStatuses[status]
-	return ok
+	Number int32 `json:"number"`
 }
 
 func (h *Handler) CreateDiningTable(c *fiber.Ctx) error {
@@ -42,32 +20,11 @@ func (h *Handler) CreateDiningTable(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "invalid_body", "invalid json body")
 	}
 
-	req.Name = strings.TrimSpace(req.Name)
-	req.Status = strings.TrimSpace(req.Status)
-	
-	if req.Number <= 0 && req.Name != "" {
-		// Try to extract number from name (e.g., "Table 5" -> 5)
-		fmt.Sscanf(req.Name, "Table %d", &req.Number)
-	}
-
 	if req.Number <= 0 {
 		req.Number = int32(time.Now().UnixNano() % 1000000)
 	}
 
-	if req.Status == "" {
-		req.Status = "available"
-	}
-
-	if !isValidDiningTableStatus(req.Status) {
-		return writeError(c, fiber.StatusBadRequest, "invalid_status", "Status must be available, ordered, preparing, or eating")
-	}
-
-	table, err := h.DB.CreateDiningTable(context.Background(), db.CreateDiningTableParams{
-		Number: req.Number,
-		Status: db.TableStatus(req.Status),
-		Name:   req.Name,
-		Seats:  req.Seats,
-	})
+	table, err := h.DB.CreateDiningTable(context.Background(), req.Number)
 	if err != nil {
 		return handleDBError(c, err)
 	}
@@ -76,11 +33,70 @@ func (h *Handler) CreateDiningTable(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ListDiningTables(c *fiber.Ctx) error {
-	tables, err := h.DB.ListDiningTables(context.Background())
+	ctx := context.Background()
+	tables, err := h.DB.ListDiningTables(ctx)
 	if err != nil {
 		return handleDBError(c, err)
 	}
-	return c.Status(fiber.StatusOK).JSON(tables)
+
+	// Dynamic status calculation
+	orders, _ := h.DB.ListOrders(ctx)
+	tableStatus := make(map[int64]string)
+	
+	// Create a map of tables for quick access to UpdatedAt
+	tableMap := make(map[int64]db.DiningTable)
+	for _, t := range tables {
+		tableMap[t.ID] = t
+	}
+
+	for _, o := range orders {
+		t, ok := tableMap[o.TableID]
+		if !ok { continue }
+		
+		// If the order was placed BEFORE the table was last "cleared" or "freed", ignore it
+		if o.OrderedAt.Time.Before(t.UpdatedAt.Time) {
+			continue
+		}
+
+		if o.Status != db.OrderStatusServed {
+			tableStatus[o.TableID] = string(o.Status)
+		} else if tableStatus[o.TableID] == "" {
+			tableStatus[o.TableID] = "eating"
+		}
+	}
+
+	type tableResponse struct {
+		ID        int64  `json:"id"`
+		Number    int32  `json:"number"`
+		Name      string `json:"name"`
+		Status    string `json:"status"`
+		CreatedAt string `json:"createdAt"`
+	}
+
+	res := make([]tableResponse, len(tables))
+	for i, t := range tables {
+		status := t.Status
+		if status == "" || status == "available" || status == "ordered" {
+			// Fallback to order status if available/ordered but has active orders
+			orderStatus := tableStatus[t.ID]
+			if orderStatus != "" {
+				status = orderStatus
+			} else if status == "ordered" {
+				// If DB says ordered but no active orders found, it might have been served
+				status = "available"
+			}
+		}
+		
+		res[i] = tableResponse{
+			ID:        t.ID,
+			Number:    t.Number,
+			Name:      fmt.Sprintf("Table %d", t.Number),
+			Status:    status,
+			CreatedAt: t.CreatedAt.Time.Format(time.RFC3339),
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
 }
 
 func (h *Handler) GetDiningTable(c *fiber.Ctx) error {
@@ -116,105 +132,17 @@ func (h *Handler) PatchDiningTableStatus(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "invalid_id", err.Error())
 	}
 
-	var req diningTableStatusRequest
+	var req struct {
+		Status string `json:"status"`
+	}
 	if err := c.BodyParser(&req); err != nil {
 		return writeError(c, fiber.StatusBadRequest, "invalid_body", "invalid json body")
 	}
 
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		return writeError(c, fiber.StatusBadRequest, "missing_fields", "status is required")
-	}
-
-	if !isValidDiningTableStatus(req.Status) {
-		return writeError(c, fiber.StatusBadRequest, "invalid_status", "invalid dining table status")
-	}
-
-	ctx := context.Background()
-	current, err := h.DB.GetDiningTable(ctx, id)
+	_, err = h.Pool.Exec(context.Background(), "UPDATE dining_tables SET status = $1, updated_at = now() WHERE id = $2", req.Status, id)
 	if err != nil {
 		return handleDBError(c, err)
 	}
 
-	if current.Status == db.TableStatus(status) {
-		return c.Status(fiber.StatusOK).JSON(current)
-	}
-
-	updated, err := h.DB.UpdateDiningTableStatus(ctx, id, db.TableStatus(status))
-	if err != nil {
-		return handleDBError(c, err)
-	}
-
-	if updated.Status == db.TableStatus("preparing") {
-		order, err := h.DB.ListOrders(ctx)
-		if err != nil {
-			return handleDBError(c, err)
-		}
-
-		var currentOrder db.Order
-		for _, o := range order {
-			if o.TableID == id {
-				currentOrder = o
-				break
-			}
-		}
-
-		if currentOrder == (db.Order{}) {
-			return writeError(c, fiber.StatusConflict, "no_order", "no order found for this table")
-		}
-
-		ingredients, err := h.DB.ListIngredients(ctx)
-		if err != nil {
-			return handleDBError(c, err)
-		}
-
-		menuIngredients := make(map[int64][]db.Ingredient)
-		for _, ingredient := range ingredients {
-			menuIngredients[ingredient.MenuItemID] = append(menuIngredients[ingredient.MenuItemID], ingredient)
-		}
-
-		inventoryItems, err := h.DB.ListInventoryItems(ctx)
-		if err != nil {
-			return handleDBError(c, err)
-		}
-
-		invByID := make(map[int64]db.InventoryItem, len(inventoryItems))
-		qtyByID := make(map[int64]float64, len(inventoryItems))
-		for _, item := range inventoryItems {
-			invByID[item.ID] = item
-			qtyByID[item.ID] = item.Quantity
-		}
-
-		changed := make(map[int64]struct{})
-		for _, ingredient := range menuIngredients[currentOrder.MenuItemID] {
-			currentQty, ok := qtyByID[ingredient.InventoryItemID]
-			if !ok {
-				return writeError(c, fiber.StatusConflict, "invalid_inventory", "inventory item not found")
-			}
-			needed := ingredient.Quantity * float64(currentOrder.Quantity)
-			newQty := currentQty - needed
-			if newQty < 0 {
-				inv := invByID[ingredient.InventoryItemID]
-				return writeError(c, fiber.StatusConflict, "insufficient_inventory", "insufficient inventory for "+inv.Name)
-			}
-			qtyByID[ingredient.InventoryItemID] = newQty
-			changed[ingredient.InventoryItemID] = struct{}{}
-		}
-
-		for id := range changed {
-			item := invByID[id]
-			_, err := h.DB.UpdateInventoryItem(ctx, db.UpdateInventoryItemParams{
-				ID:       item.ID,
-				Name:     item.Name,
-				Quantity: qtyByID[id],
-				Unit:     item.Unit,
-				VendorID: item.VendorID,
-			})
-			if err != nil {
-				return handleDBError(c, err)
-			}
-		}
-	}
-
-	return c.Status(fiber.StatusOK).JSON(updated)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "success", "message": "table status updated"})
 }

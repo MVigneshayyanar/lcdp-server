@@ -14,7 +14,6 @@ type vendorRequest struct {
 	Address string `json:"address"`
 	Email   string `json:"email"`
 	Phone   string `json:"phone"`
-	Status  string `json:"status"`
 }
 
 func (h *Handler) CreateVendor(c *fiber.Ctx) error {
@@ -32,17 +31,11 @@ func (h *Handler) CreateVendor(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "missing_fields", "name, address, email, and phone are required")
 	}
 
-	status := req.Status
-	if status == "" {
-		status = "active"
-	}
-
 	vendor, err := h.DB.CreateVendor(context.Background(), db.CreateVendorParams{
 		Name:    req.Name,
 		Address: req.Address,
 		Email:   req.Email,
 		Phone:   req.Phone,
-		Status:  status,
 	})
 	if err != nil {
 		return handleDBError(c, err)
@@ -93,18 +86,12 @@ func (h *Handler) UpdateVendor(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "missing_fields", "name, address, email, and phone are required")
 	}
 
-	status := req.Status
-	if status == "" {
-		status = "active"
-	}
-
 	vendor, err := h.DB.UpdateVendor(context.Background(), db.UpdateVendorParams{
 		ID:      id,
 		Name:    req.Name,
 		Address: req.Address,
 		Email:   req.Email,
 		Phone:   req.Phone,
-		Status:  status,
 	})
 	if err != nil {
 		return handleDBError(c, err)

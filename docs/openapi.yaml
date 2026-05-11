@@ -11,10 +11,6 @@ components:
       type: apiKey
       in: cookie
       name: session
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
   schemas:
     ErrorResponse:
       type: object
@@ -61,12 +57,6 @@ components:
           enum: [waiter, manager, admin, owner]
         phone:
           type: string
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
     UserRequest:
       type: object
       required: [name, role, phone]
@@ -84,17 +74,9 @@ components:
         id:
           type: integer
           format: int64
-        name:
-          type: string
         status:
           type: string
-          enum: [available, ordered, preparing, ready, eating, dirty]
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
+          description: "Derived status: available, ordered, preparing, ready, eating"
     DiningTableRequest:
       type: object
       required: [name, status]
@@ -167,12 +149,6 @@ components:
           type: string
         phone:
           type: string
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
     VendorRequest:
       type: object
       required: [name, address, email, phone]
@@ -474,6 +450,16 @@ components:
           format: date-time
         size:
           type: string
+    BillScanRequest:
+      type: object
+      required: [image]
+      properties:
+        image:
+          type: string
+          description: "Base64 encoded image content"
+        mimeType:
+          type: string
+          description: "MIME type of the image (e.g. image/jpeg, image/png)"
 paths:
   /login:
     get:
@@ -584,7 +570,7 @@ paths:
   /v1/analytics/overview:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get analytics overview
       responses:
         '200':
@@ -596,7 +582,7 @@ paths:
   /v1/analytics/revenue:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get revenue analytics
       responses:
         '200':
@@ -604,7 +590,7 @@ paths:
   /v1/analytics/sales:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get sales analytics
       responses:
         '200':
@@ -612,7 +598,7 @@ paths:
   /v1/analytics/inventory:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get inventory analytics
       responses:
         '200':
@@ -620,7 +606,7 @@ paths:
   /v1/tables:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List dining tables
       responses:
         '200':
@@ -633,7 +619,7 @@ paths:
                   $ref: '#/components/schemas/DiningTable'
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create dining table
       requestBody:
         required: true
@@ -647,7 +633,7 @@ paths:
   /v1/tables/{id}:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get dining table
       parameters:
         - in: path
@@ -661,7 +647,7 @@ paths:
           description: Success
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete dining table
       parameters:
         - in: path
@@ -676,7 +662,7 @@ paths:
   /v1/tables/{id}/status:
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Update dining table status
       parameters:
         - in: path
@@ -697,7 +683,7 @@ paths:
   /v1/menu:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List menu items
       responses:
         '200':
@@ -710,7 +696,7 @@ paths:
                   $ref: '#/components/schemas/MenuItem'
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create menu item
       requestBody:
         required: true
@@ -724,7 +710,7 @@ paths:
   /v1/menu/{id}:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get menu item
       parameters:
         - in: path
@@ -738,7 +724,7 @@ paths:
           description: Success
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Update menu item
       parameters:
         - in: path
@@ -758,7 +744,7 @@ paths:
           description: Success
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete menu item
       parameters:
         - in: path
@@ -773,7 +759,7 @@ paths:
   /v1/orders:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List orders
       responses:
         '200':
@@ -786,7 +772,7 @@ paths:
                   $ref: '#/components/schemas/OrderView'
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create order
       requestBody:
         required: true
@@ -800,7 +786,7 @@ paths:
   /v1/orders/{id}:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get order details
       parameters:
         - in: path
@@ -814,7 +800,7 @@ paths:
           description: Success
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete order
       parameters:
         - in: path
@@ -829,7 +815,7 @@ paths:
   /v1/orders/{id}/served:
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Mark order as served
       parameters:
         - in: path
@@ -844,7 +830,7 @@ paths:
   /v1/inventory:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List inventory items
       responses:
         '200':
@@ -857,7 +843,7 @@ paths:
                   $ref: '#/components/schemas/InventoryItem'
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create inventory item
       requestBody:
         required: true
@@ -871,7 +857,7 @@ paths:
   /v1/inventory/{id}:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get inventory item
       parameters:
         - in: path
@@ -885,7 +871,7 @@ paths:
           description: Success
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Update inventory item
       parameters:
         - in: path
@@ -905,7 +891,7 @@ paths:
           description: Success
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete inventory item
       parameters:
         - in: path
@@ -920,7 +906,7 @@ paths:
   /v1/payables:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List all payables (bills)
       responses:
         '200':
@@ -928,7 +914,7 @@ paths:
   /v1/payables/{id}/paid:
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Mark a payable as paid
       parameters:
         - in: path
@@ -943,7 +929,7 @@ paths:
   /v1/alerts:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List active alerts
       responses:
         '200':
@@ -957,7 +943,7 @@ paths:
   /v1/alerts/{id}/read:
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Mark alert as read
       parameters:
         - in: path
@@ -971,7 +957,7 @@ paths:
   /v1/kitchen/orders:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List orders for kitchen display
       responses:
         '200':
@@ -985,7 +971,7 @@ paths:
   /v1/kitchen/orders/{id}/start:
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Start preparing kitchen order
       parameters:
         - in: path
@@ -1000,7 +986,7 @@ paths:
   /v1/kitchen/orders/{id}/ready:
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Mark kitchen order as ready
       parameters:
         - in: path
@@ -1015,14 +1001,14 @@ paths:
   /v1/waiters:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List waiters (users)
       responses:
         '200':
           description: Success
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create waiter
       requestBody:
         required: true
@@ -1036,7 +1022,7 @@ paths:
   /v1/waiters/{id}:
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete waiter
       parameters:
         - in: path
@@ -1051,14 +1037,14 @@ paths:
   /v1/users:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List users
       responses:
         '200':
           description: Success
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create user
       responses:
         '201':
@@ -1066,7 +1052,7 @@ paths:
   /v1/vendors:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List vendors
       responses:
         '200':
@@ -1079,7 +1065,7 @@ paths:
                   $ref: '#/components/schemas/Vendor'
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create vendor
       requestBody:
         required: true
@@ -1093,7 +1079,7 @@ paths:
   /v1/vendors/{id}:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get vendor details
       parameters:
         - in: path
@@ -1107,7 +1093,7 @@ paths:
           description: Success
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Update vendor
       parameters:
         - in: path
@@ -1127,7 +1113,7 @@ paths:
           description: Success
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete vendor
       parameters:
         - in: path
@@ -1142,7 +1128,7 @@ paths:
   /v1/bills:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List bills
       responses:
         '200':
@@ -1155,7 +1141,7 @@ paths:
                   $ref: '#/components/schemas/Bill'
     post:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Create bill
       requestBody:
         required: true
@@ -1166,10 +1152,28 @@ paths:
       responses:
         '201':
           description: Success
+  /v1/bills/scan:
+    post:
+      security:
+        - sessionCookie: []
+      summary: Scan bill image via OCR/AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillScanRequest'
+      responses:
+        '200':
+          description: OCR results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillRequest'
   /v1/bills/{id}:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Get bill details
       parameters:
         - in: path
@@ -1183,7 +1187,7 @@ paths:
           description: Success
     patch:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Update bill
       parameters:
         - in: path
@@ -1203,7 +1207,7 @@ paths:
           description: Success
     delete:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: Delete bill
       parameters:
         - in: path
@@ -1218,7 +1222,7 @@ paths:
   /v1/reports:
     get:
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       summary: List available reports
       responses:
         '200':

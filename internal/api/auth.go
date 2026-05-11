@@ -130,9 +130,11 @@ func (h *Handler) AuthMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Try Cookie first
 		token := strings.TrimSpace(c.Cookies(h.Config.CookieName))
+		log.Printf("[DEBUG] AuthMiddleware - Cookie %s: %s\n", h.Config.CookieName, token)
 		
-		// If no cookie, try Authorization header (Bearer token)
 		if token == "" {
+			log.Println("[DEBUG] AuthMiddleware - No cookie found, checking Authorization header")
+			// fallback to header for non-browser clients
 			authHeader := c.Get("Authorization")
 			if strings.HasPrefix(authHeader, "Bearer ") {
 				token = strings.TrimPrefix(authHeader, "Bearer ")
@@ -140,11 +142,12 @@ func (h *Handler) AuthMiddleware() fiber.Handler {
 		}
 
 		if token == "" {
-			return writeError(c, fiber.StatusUnauthorized, "unauthorized", "missing session cookie or authorization header")
+			return writeError(c, fiber.StatusUnauthorized, "unauthorized", "missing session cookie")
 		}
 
 		// Allow mock tokens for development
 		if token == "mock-manager-token" || token == "mock-owner-token" || token == "mock-waiter-token" {
+			log.Printf("[DEBUG] AuthMiddleware - Using mock token: %s\n", token)
 			c.Locals("user_id", int64(1))   // Set a default user ID
 			c.Locals("user_role", "admin") // Set a default role
 			return c.Next()
@@ -154,6 +157,7 @@ func (h *Handler) AuthMiddleware() fiber.Handler {
 		session, err := h.DB.GetSessionByTokenHash(ctx, sha256Hex(token))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
+				log.Printf("[DEBUG] AuthMiddleware - Session not found for token hash: %s\n", sha256Hex(token))
 				return writeError(c, fiber.StatusUnauthorized, "unauthorized", "invalid session")
 			}
 			return handleDBError(c, err)
@@ -164,6 +168,7 @@ func (h *Handler) AuthMiddleware() fiber.Handler {
 		}
 
 		c.Locals("user_id", session.UserID)
+		log.Printf("[DEBUG] AuthMiddleware - Authorized UserID: %d\n", session.UserID)
 
 		return c.Next()
 	}
@@ -296,7 +301,21 @@ func (h *Handler) ManagerLogin(c *fiber.Ctx) error {
 	// Mock validation for now
 	if req.Email == "manager@cafedeparis.com" && req.Password == "admin123" {
 		log.Println("[AUTH SUCCESS] Manager")
-		return c.JSON(fiber.Map{"token": "mock-manager-token", "user": fiber.Map{"name": "Manager", "role": "manager"}})
+		
+		token := "mock-manager-token"
+		expiresAt := time.Now().Add(h.Config.SessionTTL)
+		
+		c.Cookie(&fiber.Cookie{
+			Name:     h.Config.CookieName,
+			Value:    token,
+			HTTPOnly: true,
+			Secure:   h.Config.CookieSecure,
+			Expires:  expiresAt,
+			Path:     "/",
+			SameSite: parseSameSite(h.Config.CookieSameSite),
+		})
+
+		return c.JSON(fiber.Map{"status": "success", "user": fiber.Map{"name": "Manager", "role": "manager"}})
 	}
 	log.Println("[AUTH FAILED] Invalid credentials")
 	return writeError(c, fiber.StatusUnauthorized, "invalid_credentials", "invalid email or password")
@@ -319,7 +338,21 @@ func (h *Handler) OwnerLogin(c *fiber.Ctx) error {
 	// Mock validation for now
 	if req.Email == "owner@cafedeparis.com" && req.Password == "admin123" {
 		log.Println("[AUTH SUCCESS] Owner")
-		return c.JSON(fiber.Map{"token": "mock-owner-token", "user": fiber.Map{"name": "Owner", "role": "owner"}})
+		
+		token := "mock-owner-token"
+		expiresAt := time.Now().Add(h.Config.SessionTTL)
+
+		c.Cookie(&fiber.Cookie{
+			Name:     h.Config.CookieName,
+			Value:    token,
+			HTTPOnly: true,
+			Secure:   h.Config.CookieSecure,
+			Expires:  expiresAt,
+			Path:     "/",
+			SameSite: parseSameSite(h.Config.CookieSameSite),
+		})
+
+		return c.JSON(fiber.Map{"status": "success", "user": fiber.Map{"name": "Owner", "role": "owner"}})
 	}
 	log.Println("[AUTH FAILED] Invalid credentials")
 	return writeError(c, fiber.StatusUnauthorized, "invalid_credentials", "invalid email or password")
@@ -362,8 +395,22 @@ func (h *Handler) VerifyOtpFlutter(c *fiber.Ctx) error {
 	// For dev: accept '123456' or any 4/6 digit code for easier testing
 	if code == "123456" || len(code) == 4 || len(code) == 6 {
 		log.Println("[AUTH SUCCESS] Flutter Waiter")
+		
+		token := "mock-waiter-token"
+		expiresAt := time.Now().Add(h.Config.SessionTTL)
+
+		c.Cookie(&fiber.Cookie{
+			Name:     h.Config.CookieName,
+			Value:    token,
+			HTTPOnly: true,
+			Secure:   h.Config.CookieSecure,
+			Expires:  expiresAt,
+			Path:     "/",
+			SameSite: parseSameSite(h.Config.CookieSameSite),
+		})
+
 		return c.JSON(fiber.Map{
-			"token": "mock-waiter-token",
+			"status": "success",
 			"user": fiber.Map{
 				"id":    1,
 				"name":  "Waiter User",

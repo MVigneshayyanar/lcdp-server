@@ -7,34 +7,42 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createMenuItem = `-- name: CreateMenuItem :one
 INSERT INTO menu_items (name, price, is_available, category, description)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, name, price, is_available, category, description, created_at, updated_at
+RETURNING id, name, price, is_available, created_at, updated_at, category, description
 `
 
 type CreateMenuItemParams struct {
-	Name        string  `json:"name"`
-	Price       float64 `json:"price"`
-	IsAvailable bool    `json:"is_available"`
-	Category    string  `json:"category"`
-	Description *string `json:"description"`
+	Name        string      `json:"name"`
+	Price       float64     `json:"price"`
+	IsAvailable bool        `json:"is_available"`
+	Category    string      `json:"category"`
+	Description pgtype.Text `json:"description"`
 }
 
 func (q *Queries) CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) (MenuItem, error) {
-	row := q.db.QueryRow(ctx, createMenuItem, arg.Name, arg.Price, arg.IsAvailable, arg.Category, arg.Description)
+	row := q.db.QueryRow(ctx, createMenuItem,
+		arg.Name,
+		arg.Price,
+		arg.IsAvailable,
+		arg.Category,
+		arg.Description,
+	)
 	var i MenuItem
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Price,
 		&i.IsAvailable,
-		&i.Category,
-		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Category,
+		&i.Description,
 	)
 	return i, err
 }
@@ -50,7 +58,7 @@ func (q *Queries) DeleteMenuItem(ctx context.Context, id int64) error {
 }
 
 const getMenuItem = `-- name: GetMenuItem :one
-SELECT id, name, price, is_available, category, description, created_at, updated_at FROM menu_items
+SELECT id, name, price, is_available, created_at, updated_at, category, description FROM menu_items
 WHERE id = $1
 `
 
@@ -62,16 +70,16 @@ func (q *Queries) GetMenuItem(ctx context.Context, id int64) (MenuItem, error) {
 		&i.Name,
 		&i.Price,
 		&i.IsAvailable,
-		&i.Category,
-		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Category,
+		&i.Description,
 	)
 	return i, err
 }
 
 const listMenuItems = `-- name: ListMenuItems :many
-SELECT id, name, price, is_available, category, description, created_at, updated_at FROM menu_items
+SELECT id, name, price, is_available, created_at, updated_at, category, description FROM menu_items
 ORDER BY id
 `
 
@@ -89,10 +97,10 @@ func (q *Queries) ListMenuItems(ctx context.Context) ([]MenuItem, error) {
 			&i.Name,
 			&i.Price,
 			&i.IsAvailable,
-			&i.Category,
-			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Category,
+			&i.Description,
 		); err != nil {
 			return nil, err
 		}
@@ -113,16 +121,16 @@ SET name = $2,
     description = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, price, is_available, category, description, created_at, updated_at
+RETURNING id, name, price, is_available, created_at, updated_at, category, description
 `
 
 type UpdateMenuItemParams struct {
-	ID          int64   `json:"id"`
-	Name        string  `json:"name"`
-	Price       float64 `json:"price"`
-	IsAvailable bool    `json:"is_available"`
-	Category    string  `json:"category"`
-	Description *string `json:"description"`
+	ID          int64       `json:"id"`
+	Name        string      `json:"name"`
+	Price       float64     `json:"price"`
+	IsAvailable bool        `json:"is_available"`
+	Category    string      `json:"category"`
+	Description pgtype.Text `json:"description"`
 }
 
 func (q *Queries) UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) (MenuItem, error) {
@@ -140,10 +148,10 @@ func (q *Queries) UpdateMenuItem(ctx context.Context, arg UpdateMenuItemParams) 
 		&i.Name,
 		&i.Price,
 		&i.IsAvailable,
-		&i.Category,
-		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Category,
+		&i.Description,
 	)
 	return i, err
 }

@@ -16,6 +16,7 @@ type Config struct {
 	CookieSameSite  string
 	SessionTTL      time.Duration
 	TwoFactorAPIKey string
+	Env             string
 }
 
 func Load() (Config, error) {
@@ -27,6 +28,7 @@ func Load() (Config, error) {
 		CookieSameSite:  getEnv("COOKIE_SAMESITE", "Lax"),
 		SessionTTL:      getDuration("SESSION_TTL", 24*time.Hour),
 		TwoFactorAPIKey: getEnv("TWOFACTOR_API_KEY", ""),
+		Env:             getEnv("ENV", "local"),
 	}
 
 	if cfg.DatabaseURL == "" {

@@ -48,10 +48,16 @@ type orderView struct {
 
 func (h *Handler) CreateOrder(c *fiber.Ctx) error {
 	fmt.Println("[DEBUG] CreateOrder hit!")
-	fmt.Printf("[DEBUG] Raw Body: %s\n", string(c.Body()))
+	rawBody := string(c.Body())
+	fmt.Printf("[DEBUG] Raw Body: %s\n", rawBody)
+
+	if rawBody == "" || rawBody == "{}" {
+		fmt.Println("[WARN] CreateOrder received empty body")
+	}
 
 	var req orderRequest
 	if err := c.BodyParser(&req); err != nil {
+		fmt.Printf("[DEBUG] BodyParser failed: %v. Trying snake_case.\n", err)
 		// Try snake_case if camelCase fails
 		var reqSnake orderRequestSnake
 		if err2 := c.BodyParser(&reqSnake); err2 == nil {
@@ -61,10 +67,11 @@ func (h *Handler) CreateOrder(c *fiber.Ctx) error {
 				req.Items[i] = orderItemReq{MenuItemID: it.MenuItemID, Quantity: it.Quantity}
 			}
 		} else {
+			fmt.Printf("[ERROR] Both BodyParsers failed: %v, %v\n", err, err2)
 			return writeError(c, 400, "invalid_request", err.Error())
 		}
 	}
-	fmt.Printf("[DEBUG] Request: %+v\n", req)
+	fmt.Printf("[DEBUG] Final Request Struct: %+v\n", req)
 
 	tableID := toInt64(req.TableID)
 	if tableID == 0 {
@@ -105,17 +112,15 @@ func (h *Handler) CreateOrder(c *fiber.Ctx) error {
 		}
 		createdOrders = append(createdOrders, order)
 	}
-
-	if len(createdOrders) > 0 {
-		// Update table status to 'ordered'
-		_, err = qtx.UpdateDiningTableStatus(ctx, tableID, db.TableStatusOrdered)
-		if err != nil {
-			fmt.Printf("[ERROR] UpdateDiningTableStatus failed for table %d: %v\n", tableID, err)
-		}
-	}
+	
 
 	if err := tx.Commit(ctx); err != nil {
 		return handleDBError(c, err)
+	}
+
+	// Update table status to 'ordered'
+	if tableID != 0 {
+		_, _ = h.Pool.Exec(ctx, "UPDATE dining_tables SET status = $1 WHERE id = $2", "ordered", tableID)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "Success", "count": len(createdOrders)})
@@ -123,9 +128,25 @@ func (h *Handler) CreateOrder(c *fiber.Ctx) error {
 
 func (h *Handler) ListOrders(c *fiber.Ctx) error {
 	ctx := context.Background()
-	orders, err := h.DB.ListOrders(ctx)
+	// Only load orders from the last 12 hours to avoid performance issues
+	rows, err := h.Pool.Query(ctx, `
+		SELECT id, menu_item_id, quantity, table_id, ordered_at, created_at, updated_at, status 
+		FROM orders 
+		WHERE status != 'served' AND ordered_at > NOW() - INTERVAL '12 hours'
+		ORDER BY ordered_at DESC
+	`)
 	if err != nil {
 		return handleDBError(c, err)
+	}
+	defer rows.Close()
+
+	var orders []db.Order
+	for rows.Next() {
+		var o db.Order
+		if err := rows.Scan(&o.ID, &o.MenuItemID, &o.Quantity, &o.TableID, &o.OrderedAt, &o.CreatedAt, &o.UpdatedAt, &o.Status); err != nil {
+			return handleDBError(c, err)
+		}
+		orders = append(orders, o)
 	}
 
 	menuItems, _ := h.DB.ListMenuItems(ctx)
@@ -137,7 +158,7 @@ func (h *Handler) ListOrders(c *fiber.Ctx) error {
 	tables, _ := h.DB.ListDiningTables(ctx)
 	tableNames := make(map[int64]string)
 	for _, t := range tables {
-		tableNames[t.ID] = t.Name
+		tableNames[t.ID] = fmt.Sprintf("Table %d", t.Number)
 	}
 
 	// Group by TableID and Status
@@ -200,7 +221,7 @@ func (h *Handler) GetOrder(c *fiber.Ctx) error {
 	view := orderView{
 		ID:        order.ID,
 		TableID:   order.TableID,
-		TableName: table.Name,
+		TableName: fmt.Sprintf("Table %d", table.Number),
 		Status:    string(order.Status),
 		CreatedAt: formatTime(order.CreatedAt),
 		Items: []orderViewItem{
@@ -237,7 +258,7 @@ func (h *Handler) ListKitchenOrders(c *fiber.Ctx) error {
 	tables, _ := h.DB.ListDiningTables(ctx)
 	tableNames := make(map[int64]string)
 	for _, t := range tables {
-		tableNames[t.ID] = t.Name
+		tableNames[t.ID] = fmt.Sprintf("Table %d", t.Number)
 	}
 
 	type kitchenOrder struct {
@@ -318,8 +339,7 @@ func (h *Handler) MarkOrderServed(c *fiber.Ctx) error {
 		}
 	}
 
-	// Update table status to 'eating'
-	qtx.UpdateDiningTableStatus(ctx, order.TableID, db.TableStatusEating)
+	// Table status is now derived
 
 	if err := tx.Commit(ctx); err != nil {
 		return handleDBError(c, err)
@@ -339,7 +359,11 @@ func (h *Handler) StartKitchenOrder(c *fiber.Ctx) error {
 		return handleDBError(c, err)
 	}
 
-	// Update ALL orders for this table with the same status (new -> preparing)
+	if order.Status != db.OrderStatusNew {
+		return writeError(c, 400, "invalid_status", "can only start new orders")
+	}
+
+	// Update ALL 'new' orders for this table to 'preparing'
 	allOrders, _ := h.DB.ListOrders(ctx)
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
@@ -348,8 +372,9 @@ func (h *Handler) StartKitchenOrder(c *fiber.Ctx) error {
 	defer tx.Rollback(ctx)
 	qtx := h.DB.WithTx(tx)
 
+	ordersToStart := []db.Order{}
 	for _, o := range allOrders {
-		if o.TableID == order.TableID && o.Status == order.Status {
+		if o.TableID == order.TableID && o.Status == db.OrderStatusNew {
 			_, err = qtx.UpdateOrder(ctx, db.UpdateOrderParams{
 				ID:         o.ID,
 				MenuItemID: o.MenuItemID,
@@ -358,16 +383,13 @@ func (h *Handler) StartKitchenOrder(c *fiber.Ctx) error {
 				OrderedAt:  o.OrderedAt,
 				Status:     db.OrderStatusPreparing,
 			})
-			if err != nil {
-				fmt.Printf("[ERROR] StartKitchenOrder failed for order %d: %v\n", o.ID, err)
+			if err == nil {
+				ordersToStart = append(ordersToStart, o)
 			}
 		}
 	}
 
-	// Update table status to 'preparing'
-	qtx.UpdateDiningTableStatus(ctx, order.TableID, db.TableStatusPreparing)
-
-	// Subtract inventory for all items being prepared
+	// Subtract inventory for all items being started
 	ingredients, _ := h.DB.ListIngredients(ctx)
 	invItems, _ := h.DB.ListInventoryItems(ctx)
 	invByID := make(map[int64]db.InventoryItem)
@@ -375,21 +397,23 @@ func (h *Handler) StartKitchenOrder(c *fiber.Ctx) error {
 		invByID[it.ID] = it
 	}
 
-	// Track cumulative deductions
 	deductions := make(map[int64]float64)
-	for _, o := range allOrders {
-		if o.TableID == order.TableID && o.Status == order.Status {
-			for _, ing := range ingredients {
-				if ing.MenuItemID == o.MenuItemID {
-					deductions[ing.InventoryItemID] += ing.Quantity * float64(o.Quantity)
-				}
+	for _, o := range ordersToStart {
+		for _, ing := range ingredients {
+			if ing.MenuItemID == o.MenuItemID {
+				deductions[ing.InventoryItemID] += ing.Quantity * float64(o.Quantity)
 			}
 		}
 	}
 
 	for invID, needed := range deductions {
-		inv := invByID[invID]
-		qtx.UpdateInventoryItem(ctx, db.UpdateInventoryItemParams{
+		inv, ok := invByID[invID]
+		if !ok {
+			fmt.Printf("[WARNING] Inventory item %d not found for deduction\n", invID)
+			continue
+		}
+		
+		_, err = qtx.UpdateInventoryItem(ctx, db.UpdateInventoryItemParams{
 			ID:       inv.ID,
 			Name:     inv.Name,
 			Quantity: inv.Quantity - needed,
@@ -398,6 +422,9 @@ func (h *Handler) StartKitchenOrder(c *fiber.Ctx) error {
 			Category: inv.Category,
 			MinStock: inv.MinStock,
 		})
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to deduct inventory for item %d: %v\n", invID, err)
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -418,7 +445,11 @@ func (h *Handler) ReadyKitchenOrder(c *fiber.Ctx) error {
 		return handleDBError(c, err)
 	}
 
-	// Update ALL orders for this table with the same status (preparing -> ready)
+	if order.Status != db.OrderStatusPreparing {
+		return writeError(c, 400, "invalid_status", "can only mark preparing orders as ready")
+	}
+
+	// Update ALL 'preparing' orders for this table to 'ready'
 	allOrders, _ := h.DB.ListOrders(ctx)
 	tx, err := h.Pool.Begin(ctx)
 	if err != nil {
@@ -428,7 +459,7 @@ func (h *Handler) ReadyKitchenOrder(c *fiber.Ctx) error {
 	qtx := h.DB.WithTx(tx)
 
 	for _, o := range allOrders {
-		if o.TableID == order.TableID && o.Status == order.Status {
+		if o.TableID == order.TableID && o.Status == db.OrderStatusPreparing {
 			_, err = qtx.UpdateOrder(ctx, db.UpdateOrderParams{
 				ID:         o.ID,
 				MenuItemID: o.MenuItemID,
@@ -437,14 +468,8 @@ func (h *Handler) ReadyKitchenOrder(c *fiber.Ctx) error {
 				OrderedAt:  o.OrderedAt,
 				Status:     db.OrderStatusReady,
 			})
-			if err != nil {
-				fmt.Printf("[ERROR] ReadyKitchenOrder failed for order %d: %v\n", o.ID, err)
-			}
 		}
 	}
-
-	// Update table status to 'ready'
-	qtx.UpdateDiningTableStatus(ctx, order.TableID, db.TableStatusReady)
 
 	if err := tx.Commit(ctx); err != nil {
 		return handleDBError(c, err)

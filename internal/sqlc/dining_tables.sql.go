@@ -10,27 +10,17 @@ import (
 )
 
 const createDiningTable = `-- name: CreateDiningTable :one
-INSERT INTO dining_tables (number, status, name, seats)
-VALUES ($1, $2, $3, $4)
-RETURNING id, number, status, name, seats, created_at, updated_at
+INSERT INTO dining_tables (number)
+VALUES ($1)
+RETURNING id, number, status, created_at, updated_at
 `
 
-type CreateDiningTableParams struct {
-	Number int32       `json:"number"`
-	Status TableStatus `json:"status"`
-	Name   string      `json:"name"`
-	Seats  int32       `json:"seats"`
-}
-
-func (q *Queries) CreateDiningTable(ctx context.Context, arg CreateDiningTableParams) (DiningTable, error) {
-	row := q.db.QueryRow(ctx, createDiningTable, arg.Number, arg.Status, arg.Name, arg.Seats)
+func (q *Queries) CreateDiningTable(ctx context.Context, number int32) (DiningTable, error) {
+	row := q.db.QueryRow(ctx, createDiningTable, number)
 	var i DiningTable
 	err := row.Scan(
 		&i.ID,
 		&i.Number,
-		&i.Status,
-		&i.Name,
-		&i.Seats,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -48,7 +38,7 @@ func (q *Queries) DeleteDiningTable(ctx context.Context, id int64) error {
 }
 
 const getDiningTable = `-- name: GetDiningTable :one
-SELECT id, number, status, name, seats, created_at, updated_at FROM dining_tables
+SELECT id, number, status, created_at, updated_at FROM dining_tables
 WHERE id = $1
 `
 
@@ -59,8 +49,6 @@ func (q *Queries) GetDiningTable(ctx context.Context, id int64) (DiningTable, er
 		&i.ID,
 		&i.Number,
 		&i.Status,
-		&i.Name,
-		&i.Seats,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -68,8 +56,8 @@ func (q *Queries) GetDiningTable(ctx context.Context, id int64) (DiningTable, er
 }
 
 const listDiningTables = `-- name: ListDiningTables :many
-SELECT id, number, status, name, seats, created_at, updated_at FROM dining_tables
-ORDER BY id
+SELECT id, number, status, created_at, updated_at FROM dining_tables
+ORDER BY number
 `
 
 func (q *Queries) ListDiningTables(ctx context.Context) ([]DiningTable, error) {
@@ -85,8 +73,6 @@ func (q *Queries) ListDiningTables(ctx context.Context) ([]DiningTable, error) {
 			&i.ID,
 			&i.Number,
 			&i.Status,
-			&i.Name,
-			&i.Seats,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -98,60 +84,4 @@ func (q *Queries) ListDiningTables(ctx context.Context) ([]DiningTable, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateDiningTable = `-- name: UpdateDiningTable :one
-UPDATE dining_tables
-SET number = $2,
-    status = $3,
-    name = $4,
-    seats = $5,
-    updated_at = now()
-WHERE id = $1
-RETURNING id, number, status, name, seats, created_at, updated_at
-`
-
-type UpdateDiningTableParams struct {
-	ID     int64       `json:"id"`
-	Number int32       `json:"number"`
-	Status TableStatus `json:"status"`
-	Name   string      `json:"name"`
-	Seats  int32       `json:"seats"`
-}
-
-func (q *Queries) UpdateDiningTable(ctx context.Context, arg UpdateDiningTableParams) (DiningTable, error) {
-	row := q.db.QueryRow(ctx, updateDiningTable, arg.ID, arg.Number, arg.Status, arg.Name, arg.Seats)
-	var i DiningTable
-	err := row.Scan(
-		&i.ID,
-		&i.Number,
-		&i.Status,
-		&i.Name,
-		&i.Seats,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-const updateDiningTableStatus = `-- name: UpdateDiningTableStatus :one
-UPDATE dining_tables
-SET status = $2,
-    updated_at = now()
-WHERE id = $1
-RETURNING id, number, status, name, seats, created_at, updated_at
-`
-
-func (q *Queries) UpdateDiningTableStatus(ctx context.Context, id int64, status TableStatus) (DiningTable, error) {
-	row := q.db.QueryRow(ctx, updateDiningTableStatus, id, status)
-	var i DiningTable
-	err := row.Scan(
-		&i.ID,
-		&i.Number,
-		&i.Status,
-		&i.Name,
-		&i.Seats,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }

@@ -7,21 +7,23 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createInventoryItem = `-- name: CreateInventoryItem :one
 INSERT INTO inventory_items (name, quantity, unit, vendor_id, category, min_stock)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, name, quantity, unit, vendor_id, category, min_stock, created_at, updated_at
+RETURNING id, name, quantity, unit, vendor_id, created_at, updated_at, category, min_stock
 `
 
 type CreateInventoryItemParams struct {
-	Name     string  `json:"name"`
-	Quantity float64 `json:"quantity"`
-	Unit     string  `json:"unit"`
-	VendorID int64   `json:"vendor_id"`
-	Category string  `json:"category"`
-	MinStock float64 `json:"min_stock"`
+	Name     string        `json:"name"`
+	Quantity float64       `json:"quantity"`
+	Unit     string        `json:"unit"`
+	VendorID int64         `json:"vendor_id"`
+	Category string        `json:"category"`
+	MinStock pgtype.Float8 `json:"min_stock"`
 }
 
 func (q *Queries) CreateInventoryItem(ctx context.Context, arg CreateInventoryItemParams) (InventoryItem, error) {
@@ -40,10 +42,10 @@ func (q *Queries) CreateInventoryItem(ctx context.Context, arg CreateInventoryIt
 		&i.Quantity,
 		&i.Unit,
 		&i.VendorID,
-		&i.Category,
-		&i.MinStock,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Category,
+		&i.MinStock,
 	)
 	return i, err
 }
@@ -59,7 +61,7 @@ func (q *Queries) DeleteInventoryItem(ctx context.Context, id int64) error {
 }
 
 const getInventoryItem = `-- name: GetInventoryItem :one
-SELECT id, name, quantity, unit, vendor_id, category, min_stock, created_at, updated_at FROM inventory_items
+SELECT id, name, quantity, unit, vendor_id, created_at, updated_at, category, min_stock FROM inventory_items
 WHERE id = $1
 `
 
@@ -72,16 +74,16 @@ func (q *Queries) GetInventoryItem(ctx context.Context, id int64) (InventoryItem
 		&i.Quantity,
 		&i.Unit,
 		&i.VendorID,
-		&i.Category,
-		&i.MinStock,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Category,
+		&i.MinStock,
 	)
 	return i, err
 }
 
 const listInventoryItems = `-- name: ListInventoryItems :many
-SELECT id, name, quantity, unit, vendor_id, category, min_stock, created_at, updated_at FROM inventory_items
+SELECT id, name, quantity, unit, vendor_id, created_at, updated_at, category, min_stock FROM inventory_items
 ORDER BY id
 `
 
@@ -100,10 +102,10 @@ func (q *Queries) ListInventoryItems(ctx context.Context) ([]InventoryItem, erro
 			&i.Quantity,
 			&i.Unit,
 			&i.VendorID,
-			&i.Category,
-			&i.MinStock,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Category,
+			&i.MinStock,
 		); err != nil {
 			return nil, err
 		}
@@ -125,17 +127,17 @@ SET name = $2,
     min_stock = $7,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, quantity, unit, vendor_id, category, min_stock, created_at, updated_at
+RETURNING id, name, quantity, unit, vendor_id, created_at, updated_at, category, min_stock
 `
 
 type UpdateInventoryItemParams struct {
-	ID       int64   `json:"id"`
-	Name     string  `json:"name"`
-	Quantity float64 `json:"quantity"`
-	Unit     string  `json:"unit"`
-	VendorID int64   `json:"vendor_id"`
-	Category string  `json:"category"`
-	MinStock float64 `json:"min_stock"`
+	ID       int64         `json:"id"`
+	Name     string        `json:"name"`
+	Quantity float64       `json:"quantity"`
+	Unit     string        `json:"unit"`
+	VendorID int64         `json:"vendor_id"`
+	Category string        `json:"category"`
+	MinStock pgtype.Float8 `json:"min_stock"`
 }
 
 func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryItemParams) (InventoryItem, error) {
@@ -155,10 +157,10 @@ func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryIt
 		&i.Quantity,
 		&i.Unit,
 		&i.VendorID,
-		&i.Category,
-		&i.MinStock,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Category,
+		&i.MinStock,
 	)
 	return i, err
 }

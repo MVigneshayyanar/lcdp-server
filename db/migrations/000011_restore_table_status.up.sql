@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE dining_tables ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'available';
+COMMIT;

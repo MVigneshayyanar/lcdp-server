@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"strings"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -17,9 +18,7 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
-	}
+	godotenv.Load()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -42,13 +41,21 @@ func main() {
 	app := fiber.New()
 	app.Use(func(c *fiber.Ctx) error {
 		fmt.Printf("[NETWORK] %s %s from %s\n", c.Method(), c.Path(), c.IP())
-		return c.Next()
+		err := c.Next()
+		if setCookie := c.Response().Header.Peek("Set-Cookie"); len(setCookie) > 0 {
+			fmt.Printf("[DEBUG] Set-Cookie: %s\n", string(setCookie))
+		}
+		return err
 	})
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+		AllowOriginsFunc: func(origin string) bool {
+			// In development, be permissive to allow Flutter Web (random ports), Svelte (5173), and Android Emulator
+			return cfg.Env == "local" || strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") || strings.HasPrefix(origin, "http://10.0.2.2") || origin == ""
+		},
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, Cookie",
+		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+		AllowCredentials: true,
 	}))
 
 	handler := api.NewHandler(cfg, db.New(pool), pool)

@@ -13,7 +13,6 @@ type userRequest struct {
 	Name   string `json:"name"`
 	Role   string `json:"role"`
 	Phone  string `json:"phone"`
-	Status string `json:"status"`
 }
 
 // Using isValidUserRole from auth.go
@@ -36,16 +35,10 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "invalid_role", "role must be waiter, manager, or admin")
 	}
 
-	status := req.Status
-	if status == "" {
-		status = "active"
-	}
-
 	user, err := h.DB.CreateUser(context.Background(), db.CreateUserParams{
-		Name:   req.Name,
-		Role:   db.UserRole(req.Role),
-		Phone:  req.Phone,
-		Status: status,
+		Name:  req.Name,
+		Role:  db.UserRole(req.Role),
+		Phone: req.Phone,
 	})
 	if err != nil {
 		return handleDBError(c, err)
@@ -98,17 +91,11 @@ func (h *Handler) UpdateUser(c *fiber.Ctx) error {
 		return writeError(c, fiber.StatusBadRequest, "invalid_role", "role must be waiter, manager, or admin")
 	}
 
-	status := req.Status
-	if status == "" {
-		status = "active"
-	}
-
 	user, err := h.DB.UpdateUser(context.Background(), db.UpdateUserParams{
 		ID:     id,
 		Name:   req.Name,
 		Role:   db.UserRole(req.Role),
 		Phone:  req.Phone,
-		Status: status,
 	})
 	if err != nil {
 		return handleDBError(c, err)

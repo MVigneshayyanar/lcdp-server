@@ -181,6 +181,7 @@ func (h *Handler) Register(app *fiber.App) {
 	// Bills (full CRUD)
 	protected.Get("/bills", h.ListBills)
 	protected.Post("/bills", h.CreateBill)
+	protected.Post("/bills/scan", h.ScanBill)
 	protected.Get("/bills/:id", h.GetBill)
 	protected.Patch("/bills/:id", h.UpdateBill)
 	protected.Delete("/bills/:id", h.DeleteBill)

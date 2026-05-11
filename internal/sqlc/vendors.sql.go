@@ -10,9 +10,9 @@ import (
 )
 
 const createVendor = `-- name: CreateVendor :one
-INSERT INTO vendors (name, address, email, phone, status)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, name, address, email, phone, status, created_at, updated_at
+INSERT INTO vendors (name, address, email, phone)
+VALUES ($1, $2, $3, $4)
+RETURNING id, name, address, email, phone, created_at, updated_at
 `
 
 type CreateVendorParams struct {
@@ -20,7 +20,6 @@ type CreateVendorParams struct {
 	Address string `json:"address"`
 	Email   string `json:"email"`
 	Phone   string `json:"phone"`
-	Status  string `json:"status"`
 }
 
 func (q *Queries) CreateVendor(ctx context.Context, arg CreateVendorParams) (Vendor, error) {
@@ -29,7 +28,6 @@ func (q *Queries) CreateVendor(ctx context.Context, arg CreateVendorParams) (Ven
 		arg.Address,
 		arg.Email,
 		arg.Phone,
-		arg.Status,
 	)
 	var i Vendor
 	err := row.Scan(
@@ -38,7 +36,6 @@ func (q *Queries) CreateVendor(ctx context.Context, arg CreateVendorParams) (Ven
 		&i.Address,
 		&i.Email,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -56,7 +53,7 @@ func (q *Queries) DeleteVendor(ctx context.Context, id int64) error {
 }
 
 const getVendor = `-- name: GetVendor :one
-SELECT id, name, address, email, phone, status, created_at, updated_at FROM vendors
+SELECT id, name, address, email, phone, created_at, updated_at FROM vendors
 WHERE id = $1
 `
 
@@ -69,7 +66,6 @@ func (q *Queries) GetVendor(ctx context.Context, id int64) (Vendor, error) {
 		&i.Address,
 		&i.Email,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -77,7 +73,7 @@ func (q *Queries) GetVendor(ctx context.Context, id int64) (Vendor, error) {
 }
 
 const listVendors = `-- name: ListVendors :many
-SELECT id, name, address, email, phone, status, created_at, updated_at FROM vendors
+SELECT id, name, address, email, phone, created_at, updated_at FROM vendors
 ORDER BY id
 `
 
@@ -96,7 +92,6 @@ func (q *Queries) ListVendors(ctx context.Context) ([]Vendor, error) {
 			&i.Address,
 			&i.Email,
 			&i.Phone,
-			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -116,10 +111,9 @@ SET name = $2,
     address = $3,
     email = $4,
     phone = $5,
-    status = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, address, email, phone, status, created_at, updated_at
+RETURNING id, name, address, email, phone, created_at, updated_at
 `
 
 type UpdateVendorParams struct {
@@ -128,7 +122,6 @@ type UpdateVendorParams struct {
 	Address string `json:"address"`
 	Email   string `json:"email"`
 	Phone   string `json:"phone"`
-	Status  string `json:"status"`
 }
 
 func (q *Queries) UpdateVendor(ctx context.Context, arg UpdateVendorParams) (Vendor, error) {
@@ -138,7 +131,6 @@ func (q *Queries) UpdateVendor(ctx context.Context, arg UpdateVendorParams) (Ven
 		arg.Address,
 		arg.Email,
 		arg.Phone,
-		arg.Status,
 	)
 	var i Vendor
 	err := row.Scan(
@@ -147,7 +139,6 @@ func (q *Queries) UpdateVendor(ctx context.Context, arg UpdateVendorParams) (Ven
 		&i.Address,
 		&i.Email,
 		&i.Phone,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

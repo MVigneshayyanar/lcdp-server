@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -208,4 +210,24 @@ func (h *Handler) MarkPayablePaid(c *fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusOK)
+}
+func (h *Handler) ScanBill(c *fiber.Ctx) error {
+	type scanRequest struct {
+		Image    string `json:"image"`
+		MimeType string `json:"mimeType"`
+	}
+	var req scanRequest
+	if err := c.BodyParser(&req); err != nil {
+		return writeError(c, fiber.StatusBadRequest, "invalid_body", "invalid json body")
+	}
+
+	// In a real app, this would call an OCR service or AI model.
+	// For this demo, we'll return a mock scanned bill result.
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"vendor_id": 1,
+		"txn_id":    fmt.Sprintf("SCAN-%d", time.Now().Unix()),
+		"amount":    124.50,
+		"due_date":   time.Now().AddDate(0, 0, 30).Format("2006-01-02"),
+		"status":     "pending",
+	})
 }

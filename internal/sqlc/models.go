@@ -11,6 +11,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AlertSeverity string
+
+const (
+	AlertSeverityInfo     AlertSeverity = "info"
+	AlertSeverityWarning  AlertSeverity = "warning"
+	AlertSeverityCritical AlertSeverity = "critical"
+)
+
+func (e *AlertSeverity) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AlertSeverity(s)
+	case string:
+		*e = AlertSeverity(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AlertSeverity: %T", src)
+	}
+	return nil
+}
+
+type NullAlertSeverity struct {
+	AlertSeverity AlertSeverity `json:"alert_severity"`
+	Valid         bool          `json:"valid"` // Valid is true if AlertSeverity is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAlertSeverity) Scan(value interface{}) error {
+	if value == nil {
+		ns.AlertSeverity, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AlertSeverity.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAlertSeverity) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AlertSeverity), nil
+}
+
 type BillStatus string
 
 const (
@@ -54,14 +97,58 @@ func (ns NullBillStatus) Value() (driver.Value, error) {
 	return string(ns.BillStatus), nil
 }
 
+type OrderStatus string
+
+const (
+	OrderStatusNew       OrderStatus = "new"
+	OrderStatusPreparing OrderStatus = "preparing"
+	OrderStatusReady     OrderStatus = "ready"
+	OrderStatusServed    OrderStatus = "served"
+)
+
+func (e *OrderStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OrderStatus(s)
+	case string:
+		*e = OrderStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OrderStatus: %T", src)
+	}
+	return nil
+}
+
+type NullOrderStatus struct {
+	OrderStatus OrderStatus `json:"order_status"`
+	Valid       bool        `json:"valid"` // Valid is true if OrderStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOrderStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.OrderStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OrderStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOrderStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OrderStatus), nil
+}
+
 type TableStatus string
 
 const (
 	TableStatusAvailable TableStatus = "available"
 	TableStatusOrdered   TableStatus = "ordered"
 	TableStatusPreparing TableStatus = "preparing"
-	TableStatusReady     TableStatus = "ready"
 	TableStatusEating    TableStatus = "eating"
+	TableStatusReady     TableStatus = "ready"
 	TableStatusBilled    TableStatus = "billed"
 )
 
@@ -143,6 +230,18 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
+type Alert struct {
+	ID          int64              `json:"id"`
+	Type        string             `json:"type"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Severity    AlertSeverity      `json:"severity"`
+	IsRead      bool               `json:"is_read"`
+	Metadata    []byte             `json:"metadata"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Bill struct {
 	ID        int64              `json:"id"`
 	VendorID  int64              `json:"vendor_id"`
@@ -157,9 +256,7 @@ type Bill struct {
 type DiningTable struct {
 	ID        int64              `json:"id"`
 	Number    int32              `json:"number"`
-	Status    TableStatus        `json:"status"`
-	Name      string             `json:"name"`
-	Seats     int32              `json:"seats"`
+	Status    string             `json:"status"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
@@ -178,11 +275,11 @@ type InventoryItem struct {
 	Name      string             `json:"name"`
 	Quantity  float64            `json:"quantity"`
 	Unit      string             `json:"unit"`
-	Category  string             `json:"category"`
-	MinStock  float64            `json:"min_stock"`
 	VendorID  int64              `json:"vendor_id"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Category  string             `json:"category"`
+	MinStock  pgtype.Float8      `json:"min_stock"`
 }
 
 type MenuItem struct {
@@ -190,30 +287,21 @@ type MenuItem struct {
 	Name        string             `json:"name"`
 	Price       float64            `json:"price"`
 	IsAvailable bool               `json:"is_available"`
-	Category    string             `json:"category"`
-	Description *string            `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	Category    string             `json:"category"`
+	Description pgtype.Text        `json:"description"`
 }
-
-type OrderStatus string
-
-const (
-	OrderStatusNew       OrderStatus = "new"
-	OrderStatusPreparing OrderStatus = "preparing"
-	OrderStatusReady     OrderStatus = "ready"
-	OrderStatusServed    OrderStatus = "served"
-)
 
 type Order struct {
 	ID         int64              `json:"id"`
 	MenuItemID int64              `json:"menu_item_id"`
 	Quantity   int32              `json:"quantity"`
 	TableID    int64              `json:"table_id"`
-	Status     OrderStatus        `json:"status"`
 	OrderedAt  pgtype.Timestamptz `json:"ordered_at"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Status     OrderStatus        `json:"status"`
 }
 
 type OtpCode struct {
@@ -240,7 +328,6 @@ type User struct {
 	Name      string             `json:"name"`
 	Role      UserRole           `json:"role"`
 	Phone     string             `json:"phone"`
-	Status    string             `json:"status"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
@@ -251,7 +338,6 @@ type Vendor struct {
 	Address   string             `json:"address"`
 	Email     string             `json:"email"`
 	Phone     string             `json:"phone"`
-	Status    string             `json:"status"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
