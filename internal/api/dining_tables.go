@@ -81,10 +81,9 @@ func (h *Handler) ListDiningTables(c *fiber.Ctx) error {
 			orderStatus := tableStatus[t.ID]
 			if orderStatus != "" {
 				status = orderStatus
-			} else if status == "ordered" {
-				// If DB says ordered but no active orders found, it might have been served
-				status = "available"
 			}
+			// Removed the logic that forced "ordered" back to "available" 
+			// if no active orders were found, as the DB status is authoritative.
 		}
 		
 		res[i] = tableResponse{
